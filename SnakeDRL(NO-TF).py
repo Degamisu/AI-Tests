@@ -1,5 +1,6 @@
 import pygame
 import random
+import math
 
 # Initialize Pygame
 pygame.init()
@@ -17,6 +18,11 @@ FPS = 15  # Increase the speed
 BLACK = (0, 0, 0)
 GREEN = (0, 255, 0)
 RED = (255, 0, 0)
+WHITE = (255, 255, 255)
+
+# Initialize variables
+apples_received = 0
+heatmap_values = [[0.0] * (HEIGHT // GRID_SIZE) for _ in range(WIDTH // GRID_SIZE)]
 
 # Create the game window
 screen = pygame.display.set_mode((WIDTH, HEIGHT))
@@ -54,8 +60,8 @@ class Snake:
 
     def grow(self):
         tail_direction = (
-            self.body[-1][0] - self.body[-2][0],
-            self.body[-1][1] - self.body[-2][1]
+            self.body[-1][0] - self.body[-2][0] if len(self.body) > 1 else self.direction[0],
+            self.body[-1][1] - self.body[-2][1] if len(self.body) > 1 else self.direction[1]
         )
         new_tail = (
             (self.body[-1][0] + tail_direction[0]) % WIDTH,
@@ -65,6 +71,9 @@ class Snake:
 
     def check_collision(self):
         return len(self.body) != len(set(self.body))
+
+    def distance_to_apple(self, apple_position):
+        return math.sqrt((self.body[0][0] - apple_position[0]) ** 2 + (self.body[0][1] - apple_position[1]) ** 2)
 
 # Define the Food class
 class Food:
@@ -122,6 +131,10 @@ while running:
     for event in pygame.event.get():
         if event.type == pygame.QUIT:
             running = False
+        elif event.type == pygame.KEYDOWN:
+            if event.key == pygame.K_h:
+                # Toggle heatmap display
+                heatmap_display = not heatmap_display
 
     # Get current state
     state = q_agent.get_state_key(snake.body[0], food.position)
@@ -139,8 +152,11 @@ while running:
 
     # Check for collision with the food
     if snake.body[0] == food.position:
+        distance = snake.distance_to_apple(food.position)
+        reward = 1 / (1 + distance)  # Reward based on proximity to the apple
         snake.grow()
         food.respawn()
+        apples_received += 1
 
     # Check for collision with the walls or itself
     if snake.check_collision():
@@ -151,11 +167,16 @@ while running:
     # Get the next state
     next_state = q_agent.get_state_key(snake.body[0], food.position)
 
-    # Get the reward (you may need to adjust the reward function based on your goals)
-    reward = 1 if snake.body[0] == food.position else 0
-
     # Update Q-value based on the observed reward
     q_agent.update_q_value(reward, next_state)
+
+    # Update heatmap values
+    for i in range(len(heatmap_values)):
+        for j in range(len(heatmap_values[0])):
+            if (i * GRID_SIZE, j * GRID_SIZE) == food.position:
+                heatmap_values[i][j] = 1
+            else:
+                heatmap_values[i][j] *= 0.9
 
     # Draw everything
     screen.fill(BLACK)
@@ -168,11 +189,20 @@ while running:
     fps_text = debug_font.render(f"FPS: {int(clock.get_fps())}", True, debug_color)
     direction_text = debug_font.render(f"Direction: {action}", True, debug_color)
     brain_text = debug_font.render(f"Snake Brain: {q_agent.q_table[state]}", True, debug_color)
+    apples_text = debug_font.render(f"Apples: {apples_received}", True, debug_color)
 
     # Draw debugging information
     screen.blit(fps_text, (10, 10))
     screen.blit(direction_text, (10, 30))
     screen.blit(brain_text, (10, 50))
+    screen.blit(apples_text, (10, 70))
+
+    # Draw heatmap
+    if heatmap_display:
+        for i in range(len(heatmap_values)):
+            for j in range(len(heatmap_values[0])):
+                color = int(255 * heatmap_values[i][j])
+                pygame.draw.rect(screen, (color, color, color), (j * GRID_SIZE, i * GRID_SIZE, GRID_SIZE, GRID_SIZE))
 
     pygame.display.flip()
     clock.tick(FPS)
