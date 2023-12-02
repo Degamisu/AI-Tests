@@ -109,7 +109,7 @@ class QLearningAgent:
             return max((value, action) for action, value in enumerate(self.q_table[state]))[1]
 
     def update_q_value(self, reward, next_state):
-        # Q-learning update rule
+    # Q-learning update rule
         if self.prev_state is not None and self.prev_action is not None:
             current_q_value = self.q_table[self.prev_state][self.prev_action]
             best_next_action = max((value, a) for a, value in enumerate(self.q_table[next_state]))[1]
@@ -118,6 +118,7 @@ class QLearningAgent:
 
             # Update Q-value in the Q-table
             self.q_table[self.prev_state][self.prev_action] = updated_q_value
+
 
     def reset_memory(self):
         self.prev_state = None
