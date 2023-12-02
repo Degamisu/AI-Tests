@@ -1,6 +1,7 @@
 import pygame
 import random
 import math
+import matplotlib.pyplot as plt
 
 # Initialize Pygame
 pygame.init()
@@ -12,7 +13,8 @@ debug_color = (255, 255, 255)
 # Constants
 WIDTH, HEIGHT = 400, 400
 GRID_SIZE = 20
-FPS = 15  # Increase the speed
+FPS = 15  # Initial speed
+speed_multiplier = 1  # Speed multiplier for simulation
 
 # Colors
 BLACK = (0, 0, 0)
@@ -22,6 +24,7 @@ WHITE = (255, 255, 255)
 
 # Initialize variables
 apples_received = 0
+heatmap_display = True  # Added variable to control heatmap display
 heatmap_values = [[0.0] * (HEIGHT // GRID_SIZE) for _ in range(WIDTH // GRID_SIZE)]
 
 # Create the game window
@@ -125,9 +128,15 @@ snake = Snake()
 food = Food()
 q_agent = QLearningAgent()
 
+# Initialize q_values_over_time before the loop
+q_values_over_time = []
+
 # Main game loop
 running = True
+iteration = 0
+
 while running:
+    reward = 0  # Initialize reward
     for event in pygame.event.get():
         if event.type == pygame.QUIT:
             running = False
@@ -135,6 +144,12 @@ while running:
             if event.key == pygame.K_h:
                 # Toggle heatmap display
                 heatmap_display = not heatmap_display
+            elif event.key == pygame.K_KP_PLUS or event.key == pygame.K_PLUS:
+                # Increase speed
+                speed_multiplier += 0.1
+            elif event.key == pygame.K_KP_MINUS or event.key == pygame.K_MINUS:
+                # Decrease speed
+                speed_multiplier = max(speed_multiplier - 0.1, 0.1)
 
     # Get current state
     state = q_agent.get_state_key(snake.body[0], food.position)
@@ -178,6 +193,12 @@ while running:
             else:
                 heatmap_values[i][j] *= 0.9
 
+    # Visualization
+    if iteration % 100 == 0:
+        q_values_over_time.append(q_agent.q_table[state][:])
+
+    iteration += 1
+
     # Draw everything
     screen.fill(BLACK)
     for segment in snake.body:
@@ -205,10 +226,17 @@ while running:
                 pygame.draw.rect(screen, (color, color, color), (j * GRID_SIZE, i * GRID_SIZE, GRID_SIZE, GRID_SIZE))
 
     pygame.display.flip()
-    clock.tick(FPS)
+    clock.tick(int(FPS * speed_multiplier))
 
     # Reset Q-learning agent's memory
     q_agent.reset_memory()
 
 # Quit Pygame
 pygame.quit()
+
+# Visualize Q-values over time
+plt.plot(q_values_over_time)
+plt.xlabel('Iterations (in hundreds)')
+plt.ylabel('Q-values')
+plt.title('Q-values Over Time')
+plt.show()
